@@ -117,10 +117,11 @@ bool hash_verify(const uint8_t hash[RC4HASH_SIZE], const char *password) {
 int main(int argc, char **argv) {
     int opt;
     uint32_t difficulty = 262143;
+    uint32_t salt = salt_generate();
     char *p = NULL, *v = NULL;
 
     /* Parse command line. */
-    while ((opt = getopt(argc, argv, "d:p:v:")) >= 0) {
+    while ((opt = getopt(argc, argv, "d:p:s:v:")) >= 0) {
         switch (opt) {
         case 'd':
             difficulty = strtoll(optarg, NULL, 10);
@@ -130,6 +131,9 @@ int main(int argc, char **argv) {
             break;
         case 'v':
             v = optarg;
+            break;
+        case 's':
+            salt = strtoll(optarg, NULL, 10);
             break;
         case '?':
             exit(EXIT_FAILURE);
@@ -156,7 +160,7 @@ int main(int argc, char **argv) {
         }
     } else {
         /* Hash */
-        hash_password(hash, p, difficulty, salt_generate());
+        hash_password(hash, p, difficulty, salt);
         hash_print(hash);
         putchar('\n');
     }
