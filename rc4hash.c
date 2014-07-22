@@ -107,11 +107,11 @@ bool hash_verify(const uint8_t hash[RC4HASH_SIZE], const char *password) {
     hash_password(compare, password, difficulty, salt);
 
     /* Constant time comparison. */
-    bool valid = true;
+    int check = 0;
     for (int i = 0; i < RC4HASH_SIZE; i++) {
-        if (hash[i] != compare[i]) valid = false;
+        check |= hash[i] ^ compare[i];
     }
-    return valid;
+    return check == 0;
 }
 
 int main(int argc, char **argv) {
