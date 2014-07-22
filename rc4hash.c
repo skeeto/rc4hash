@@ -68,7 +68,7 @@ void hash_password(uint8_t output[RC4HASH_SIZE], const char *password,
     size_t length = strlen(password);
     memcpy(buffer, password, length);
     rc4_emit(&rc4, buffer + length, sizeof(buffer) - length);
-    for (uint64_t i = 0; i < difficulty; i++) {
+    for (uint64_t i = 0; i <= difficulty; i++) {
         rc4_schedule(&rc4, buffer, sizeof(buffer));
     }
 

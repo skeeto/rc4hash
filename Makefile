@@ -5,4 +5,4 @@ rc4hash : rc4hash.c
 
 run : rc4hash
 	./$^ -p testpw
-	./$^ -p testpw -v 35fe67960003ffff16ccb2b84fc68636d211db12fc01b2b36cb32f79
+	./$^ -p testpw -v c74118470003ffff53c331eb8f526fe6e70a91b0f5608ae8c95e75ae
