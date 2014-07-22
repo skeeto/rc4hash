@@ -22,10 +22,10 @@ void rc4_init(struct rc4 *k) {
     for (int i = 0; i < 256; i++) k->S[i] = i;
 }
 
-void rc4_schedule(struct rc4 *k, const uint8_t *key, size_t len) {
+void rc4_schedule(struct rc4 *k, const uint8_t *key, size_t length) {
     int j = 0;
     for (int i = 0; i < 256; i++) {
-        j = (j + k->S[i] + key[i % len]) % 256;
+        j = (j + k->S[i] + key[i % length]) % 256;
         SWAP(k->S[i], k->S[j]);
     }
 }
