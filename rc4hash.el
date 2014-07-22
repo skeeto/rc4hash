@@ -22,8 +22,8 @@
 (defun rc4--swap (rc4 i j)
   "Swap bytes at positions I and J in RC4's state."
   (let ((temp (aref (rc4-state rc4) i)))
-    (aset (rc4-state rc4) i (aref (rc4-state rc4) j))
-    (aset (rc4-state rc4) j temp)))
+    (setf (aref (rc4-state rc4) i) (aref (rc4-state rc4) j)
+          (aref (rc4-state rc4) j) temp)))
 
 (defun rc4-mix (rc4 key)
   "Mix arbitrary-length KEY into RC4's state. KEY will be treated
