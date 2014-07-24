@@ -1,4 +1,4 @@
-# RC4HASH: RC4-based Password Hashing
+# RC4HASH: RC4 Password Hashing
 
 The goal of RC4HASH is to specify and implement the simplest possible,
 reasonably secure password hashing function. Being based on RC4, it's
