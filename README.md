@@ -11,6 +11,17 @@ variable difficulty setting. On a modern computer, this difficulty
 scales between a few microseconds per hash (0) all the way to the heat
 death of the universe (255).
 
+## Example Hashes
+
+    foobar    0a628b131266d08803c72feca08918ea1cee3d1c3711b78974dd
+    testpass  3aea29920099e47a1acb45978ec97bf0a5b0375eb0f667e2bbe1
+    naïve     b74f02b80a762a0763b3df0099e3f1575699a35dff138b05d314
+    long      ef73a67418f736f2f82c32c397380d42bd7d3925339817da9851
+    blank     0000000000a7e8ed1ca21214219626a234c3db4299b22bea54be
+
+Each of these should validate on any implementation. The last is a
+special case where the salt and difficulty are 0.
+
 ## Algorithm
 
 RC4 follows the specification as listed [in the RC4 Wikipedia
