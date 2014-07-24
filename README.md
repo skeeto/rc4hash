@@ -53,7 +53,7 @@ algorithms, each being used more than once.
 * Mix the padded password into the generator state using the key
   schedule algorithm (KSA). Repeat this a total of `1 << difficulty`
   times.
-* Generate (PRGA) and discard `(1 << (difficulty + 6)) - 1` bytes of
+* Generate (PRGA) and discard `((1 << difficulty) - 1) * 64` bytes of
   output from the generator.
 * Generate (PRGA) and keep 21 bytes of output from the generator.
 * Concatenate the salt, the 1-byte difficulty factor, and the 21 bytes

@@ -14,4 +14,4 @@ clean :
 
 run : rc4hash
 	./$^ -p testpw
-	./$^ -p testpw -v 737b027e122ce0f738a8530c3b56aab22c89a10375c1ededeeb0
+	./$^ -p testpw -v f6a6f740126efae27c94b93bc138832eeca746aef2780e734284

@@ -52,8 +52,8 @@ void rc4hash(struct rc4hash *hash, const char *password) {
         rc4_schedule(&rc4, buffer, sizeof(buffer));
     }
 
-    /* Skip 2^(difficulty+6)-1 bytes of output. */
-    rc4_skip(&rc4, (1 << (hash->difficulty + 6)) - 1);
+    /* Skip (2^difficulty-1)*64 bytes of output. */
+    rc4_skip(&rc4, ((1 << hash->difficulty) - 1) * 64);
 
     /* Emit output. */
     rc4_emit(&rc4, hash->hash, RC4HASH_SIZE - RC4HASH_HEADER_SIZE);
