@@ -65,7 +65,7 @@ KEY will be treated as UTF-8 if multibyte."
                   nil "-c" (number-to-string 4))
     (buffer-string)))
 
-(cl-defun rc4hash (password &optional (difficulty 262143) (salt (rc4hash-salt)))
+(cl-defun rc4hash (password &key (difficulty 18) (salt (rc4hash-salt)) binary)
   "Produce a salted RC4 hash for PASSWORD, using DIFFICULTY factor, and SALT.
 The higher the difficulty, the greater the time the hash takes to
 compute and verify."
@@ -74,27 +74,15 @@ compute and verify."
     (rc4-mix rc4 salt)
     (let* ((padsize (- 256 (length upassword)))
            (key (concat upassword (rc4-emit-n rc4 padsize))))
-      (dotimes (_ (1+ difficulty))
+      (dotimes (_ (lsh 1 difficulty))
         (rc4-mix rc4 key)))
-    (cl-loop repeat (* difficulty 64) do (rc4-emit rc4))
-    (concat salt (rc4hash-encode-uint32 difficulty) (rc4-emit-n rc4 20))))
+    (cl-loop repeat (* (- (lsh 1 difficulty) 1) 64) do (rc4-emit rc4))
+    (let ((hash (concat salt (list difficulty) (rc4-emit-n rc4 21))))
+      (if binary
+          hash
+        (rc4hash--to-hex hash)))))
 
-(defun rc4hash-encode-uint32 (x)
-  "Encode integer X as a 4-element unibyte string."
-  (unibyte-string
-   (logand (lsh x -24) #xff)
-   (logand (lsh x -16) #xff)
-   (logand (lsh x  -8) #xff)
-   (logand (lsh x   0) #xff)))
-
-(defun rc4hash-decode-uint32 (string)
-  "Decode an integer from a 4-element unibyte string."
-  (+ (lsh (aref string 0) 24)
-     (lsh (aref string 1) 16)
-     (lsh (aref string 2) 8)
-     (lsh (aref string 3) 0)))
-
-(defun rc4hash-to-hex (hash)
+(defun rc4hash--to-hex (hash)
   "Convert unibyte string HASH to a string of hexidecimal digits."
   (let ((output (make-string (* 2 (length hash)) 0)))
     (prog1 output
@@ -103,7 +91,7 @@ compute and verify."
           (setf (aref output (+ 0 (* i 2))) (aref byte 0)
                 (aref output (+ 1 (* i 2))) (aref byte 1)))))))
 
-(defun rc4hash-from-hex (string)
+(defun rc4hash--from-hex (string)
   "Compute STRING of hexidecimal digits to a unibyte string."
   (let ((output (make-string (/ (length string) 2) 0)))
     (prog1 output
@@ -111,11 +99,14 @@ compute and verify."
         (let ((digits (substring string (* 2 i) (* 2 (1+ i)))))
           (setf (aref output i) (string-to-number digits 16)))))))
 
-(defun rc4hash-verify (hash password)
+(defun rc4hash-verify (hash password &optional binary)
   "Verify HASH for given PASSWORD, returning non-nil for valid match."
-  (let ((salt (substring hash 0 4))
-        (difficulty (rc4hash-decode-uint32 (substring hash 4 8))))
-    (string= (rc4hash password difficulty salt) hash)))
+  (unless binary
+    (setf hash (rc4hash--from-hex hash)))
+  (let* ((salt (substring hash 0 4))
+         (difficulty (aref hash 4))
+         (copy (rc4hash password :difficulty difficulty :salt salt :binary t)))
+    (string= copy hash)))
 
 (provide 'rc4hash)
 
