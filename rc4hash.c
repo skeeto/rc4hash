@@ -6,9 +6,9 @@
 #include "rc4.h"
 #include "rc4hash.h"
 
-static struct rc4 salt_generator;
+static struct rc4 entropy_pool;
 
-static void salt_init() {
+static void entropy_init() {
     FILE *urandom = fopen("/dev/urandom", "r");
     if (urandom == NULL) {
         fprintf(stderr, "error: could not seed entropy pool\n");
@@ -20,17 +20,21 @@ static void salt_init() {
         count -= fread(&seed, 1, count, urandom);
     }
     fclose(urandom);
-    rc4_init(&salt_generator);
-    rc4_schedule(&salt_generator, seed, sizeof(seed));
-    rc4_skip(&salt_generator, 4096);
+    rc4_init(&entropy_pool);
+    rc4_schedule(&entropy_pool, seed, sizeof(seed));
+    rc4_skip(&entropy_pool, 4096);
+}
+
+void entropy_get(void *buffer, size_t count) {
+    if (entropy_pool.S[0] == entropy_pool.S[1]) {
+        entropy_init();
+    }
+    rc4_emit(&entropy_pool, buffer, count);
 }
 
 uint32_t salt_generate() {
-    if (salt_generator.S[0] == salt_generator.S[1]) {
-        salt_init();
-    }
     uint32_t salt;
-    rc4_emit(&salt_generator, &salt, sizeof(salt));
+    entropy_get(&salt, sizeof(salt));
     return salt;
 }
 

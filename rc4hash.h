@@ -15,6 +15,7 @@ struct rc4hash {
 };
 
 uint32_t salt_generate();
+void entropy_get(void *buffer, size_t count);
 void rc4hash(struct rc4hash *hash, const char *password);
 void rc4hash_pack(const struct rc4hash *hash, void *buffer);
 void rc4hash_unpack(struct rc4hash *hash, const char *input);
