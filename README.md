@@ -13,17 +13,21 @@ death of the universe (255).
 
 ## Algorithm
 
-RC4 follows the specification exactly as listed [in the RC4 Wikipedia
-article](http://en.wikipedia.org/wiki/RC4). There are two specific
-algorithms, each being used more than once.
+RC4 follows the specification as listed [in the RC4 Wikipedia
+article](http://en.wikipedia.org/wiki/RC4). There are three specific
+algorithms, the second one (KSA) being run multiple times. Unlike KSA,
+the counters in PRGA are never reset.
 
 ### RC4
 
-#### Key Schedule (KSA)
+#### Initialization (IA)
 
     for i from 0 to 255
         S[i] := i
     endfor
+
+#### Key Schedule (KSA)
+
     j := 0
     for i from 0 to 255
         j := (j + S[i] + key[i mod keylength]) mod 256
@@ -44,10 +48,10 @@ algorithms, each being used more than once.
 
 ### Hashing
 
-* The input is an unsigned 8-bit difficulty setting (default: 18) and
-  a UTF-8 encoded, NFC-normalized (not required) password.
+* The inputs are an unsigned 8-bit difficulty setting (default: 18)
+  and a UTF-8 encoded, NFC-normalized (not required) password.
 * Retrieve/generate 32 bits of random data as the salt.
-* Initialize an RC4 random generator.
+* Initialize an RC4 random generator (IA).
 * Mix the salt into the generator using the key schedule algorithm (KSA).
 * Use the generator to pad the supplied password out to 256 bytes (PRGA).
 * Mix the padded password into the generator state using the key
@@ -70,4 +74,5 @@ algorithms, each being used more than once.
 
 ## References
 
-Inspired by this challenge: [Challenge #172 BREACH!](http://redd.it/2ba46z)
+* Inspired by: [Challenge #172 BREACH!](http://redd.it/2ba46z)
+* [An RC4 Password Hashing Function](http://nullprogram.com/blog/2014/07/23/)
