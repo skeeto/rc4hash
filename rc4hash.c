@@ -4,15 +4,13 @@
 #include <stdbool.h>
 #include <string.h>
 #include <getopt.h>
+#include <arpa/inet.h>
 #include "rc4.h"
 #include "rc4hash.h"
 
-#define RC4HASH_SIZE        26
-#define RC4HASH_HEADER_SIZE 5
-
 static struct rc4 salt_generator;
 
-void salt_init() {
+static void salt_init() {
     FILE *urandom = fopen("/dev/urandom", "r");
     if (urandom == NULL) {
         fprintf(stderr, "error: could not seed entropy pool");
@@ -38,74 +36,89 @@ uint32_t salt_generate() {
     return salt;
 }
 
-void hash_password(uint8_t output[RC4HASH_SIZE], const char *password,
-                   uint8_t difficulty, uint32_t salt) {
-    /* Write header. */
-    memcpy(output, &salt, sizeof(salt));
-    memcpy(output + sizeof(salt), &difficulty, sizeof(difficulty));
-
-    /* Initialize random generator. */
+void rc4hash(struct rc4hash *hash, const char *password) {
     struct rc4 rc4;
     rc4_init(&rc4);
-    rc4_schedule(&rc4, (char *) &salt, sizeof(salt));
+    rc4_schedule(&rc4, (char *) &hash->salt, sizeof(hash->salt));
 
     /* Run scheduler 2^difficulty times. */
     char buffer[256];
     size_t length = strlen(password);
     memcpy(buffer, password, length);
     rc4_emit(&rc4, buffer + length, sizeof(buffer) - length);
-    for (uint64_t i = 0; i <= 1 << difficulty; i++) {
+    for (uint64_t i = 0; i <= 1 << hash->difficulty; i++) {
         rc4_schedule(&rc4, buffer, sizeof(buffer));
     }
 
     /* Skip 2^(difficulty+6)-1 bytes of output. */
-    rc4_skip(&rc4, (1 << (difficulty + 6)) - 1);
+    rc4_skip(&rc4, (1 << (hash->difficulty + 6)) - 1);
 
     /* Emit output. */
-    rc4_emit(&rc4, output + RC4HASH_HEADER_SIZE,
-             RC4HASH_SIZE - RC4HASH_HEADER_SIZE);
+    rc4_emit(&rc4, hash->hash, RC4HASH_SIZE - RC4HASH_HEADER_SIZE);
 }
 
-void hash_print(const uint8_t hash[RC4HASH_SIZE]) {
-    for (int i = 0; i < RC4HASH_SIZE; i++) printf("%02x", hash[i]);
+void rc4hash_pack(const struct rc4hash *hash, void *buffer) {
+    memcpy(buffer, &hash->salt, sizeof(hash->salt));
+    memcpy(buffer + sizeof(hash->salt), &hash->difficulty, 1);
+    memcpy(buffer + sizeof(hash->salt) + 1, &hash->hash, sizeof(hash->hash));
 }
 
-void hash_parse(uint8_t output[RC4HASH_SIZE], const char *input) {
-    char n[3] = {0};
+void rc4hash_unpack(struct rc4hash *hash, const char *input) {
+    memcpy(&hash->salt, input, sizeof(hash->salt));
+    memcpy(&hash->difficulty, input + sizeof(hash->salt), 1);
+    memcpy(&hash->hash, input + RC4HASH_HEADER_SIZE,
+           RC4HASH_SIZE - RC4HASH_HEADER_SIZE);
+}
+
+void rc4hash_print(const struct rc4hash *hash, FILE *out) {
+    uint8_t packed[RC4HASH_SIZE];
+    rc4hash_pack(hash, packed);
     for (int i = 0; i < RC4HASH_SIZE; i++) {
-        memcpy(n, input + i * 2, 2);
-        output[i] = strtol(n, NULL, 16);
+        fprintf(out, "%02x", packed[i]);
     }
 }
 
-bool hash_verify(const uint8_t hash[RC4HASH_SIZE], const char *password) {
-    /* Compute the identical hash. */
-    uint32_t salt, difficulty;
-    memcpy(&salt, hash, sizeof(salt));
-    memcpy(&difficulty, hash + sizeof(salt), sizeof(difficulty));
-    //difficulty = (difficulty);
-    uint8_t compare[RC4HASH_SIZE];
-    hash_password(compare, password, difficulty, salt);
-
-    /* Constant time comparison. */
-    int check = 0;
+void rc4hash_parse(struct rc4hash *hash, const char *input) {
+    uint8_t extract[RC4HASH_SIZE];
+    char n[3] = {0};
     for (int i = 0; i < RC4HASH_SIZE; i++) {
-        check |= hash[i] ^ compare[i];
+        memcpy(n, input + i * 2, 2);
+        extract[i] = strtol(n, NULL, 16);
+    }
+    rc4hash_unpack(hash, (char *) extract);
+}
+
+bool rc4hash_verify(const struct rc4hash *hash, const char *password) {
+    struct rc4hash compare = {hash->salt, hash->difficulty};
+    rc4hash(&compare, password);
+    int check = 0;
+    for (int i = 0; i < RC4HASH_SIZE - RC4HASH_HEADER_SIZE; i++) {
+        check |= hash->hash[i] ^ compare.hash[i];
     }
     return check == 0;
 }
 
+void print_usage(FILE *out) {
+    fprintf(out, "Usage: rc4hash [options]\n");
+    fprintf(out, "  -p <password>    Password to be hashed (required)\n");
+    fprintf(out, "  -v <hex hash>    Validates hash against given password\n");
+    fprintf(out, "  -d <difficulty>  Difficulty factor (0-255, default: 18)\n");
+    fprintf(out, "  -s <hex salt>    Hardcoded salt value (default: random)\n");
+}
+
 int main(int argc, char **argv) {
-    int opt;
-    uint32_t difficulty = 18;
-    uint32_t salt = salt_generate();
+    struct rc4hash hash = {salt_generate(), 18};
     char *p = NULL, *v = NULL;
 
     /* Parse command line. */
-    while ((opt = getopt(argc, argv, "d:p:s:v:")) >= 0) {
+    int opt;
+    while ((opt = getopt(argc, argv, "d:s:p:v:")) >= 0) {
         switch (opt) {
         case 'd':
-            difficulty = strtoll(optarg, NULL, 10);
+            hash.difficulty = strtol(optarg, NULL, 10);
+            break;
+        case 's':
+            hash.salt = htonl(strtoll(optarg, NULL, 16));
             break;
         case 'p':
             p = optarg;
@@ -113,10 +126,8 @@ int main(int argc, char **argv) {
         case 'v':
             v = optarg;
             break;
-        case 's':
-            salt = strtoll(optarg, NULL, 10);
-            break;
         case '?':
+            print_usage(stderr);
             exit(EXIT_FAILURE);
         }
     }
@@ -128,11 +139,10 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
 
-    uint8_t hash[RC4HASH_SIZE];
     if (v != NULL) {
         /* Verify */
-        hash_parse(hash, v);
-        if (hash_verify(hash, p)) {
+        rc4hash_parse(&hash, v);
+        if (rc4hash_verify(&hash, p)) {
             printf("valid\n");
             exit(EXIT_SUCCESS);
         } else {
@@ -141,8 +151,8 @@ int main(int argc, char **argv) {
         }
     } else {
         /* Hash */
-        hash_password(hash, p, difficulty, salt);
-        hash_print(hash);
+        rc4hash(&hash, p);
+        rc4hash_print(&hash, stdout);
         putchar('\n');
     }
     return 0;
