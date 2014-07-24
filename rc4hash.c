@@ -4,80 +4,62 @@
 #include <stdbool.h>
 #include <string.h>
 #include <getopt.h>
-#include <arpa/inet.h>
+#include "rc4.h"
+#include "rc4hash.h"
 
-#define RC4HASH_SIZE        28
-#define RC4HASH_HEADER_SIZE 8
+#define RC4HASH_SIZE        26
+#define RC4HASH_HEADER_SIZE 5
 
-#define SWAP(a, b) if (a ^ b) {a ^= b; b ^= a; a ^= b;}
-#define MIN(a, b) (a < b ? a : b);
+static struct rc4 salt_generator;
 
-struct rc4 {
-    uint8_t S[256];
-    uint8_t i, j;
-};
-
-void rc4_init(struct rc4 *k) {
-    k->i = k->j = 0;
-    for (int i = 0; i < 256; i++) k->S[i] = i;
-}
-
-void rc4_schedule(struct rc4 *k, const uint8_t *key, size_t length) {
-    int j = 0;
-    for (int i = 0; i < 256; i++) {
-        j = (j + k->S[i] + key[i % length]) % 256;
-        SWAP(k->S[i], k->S[j]);
+void salt_init() {
+    FILE *urandom = fopen("/dev/urandom", "r");
+    if (urandom == NULL) {
+        fprintf(stderr, "error: could not seed entropy pool");
+        exit(EXIT_FAILURE); // emergency bailout
     }
-}
-
-void rc4_emit(struct rc4 *k, uint8_t *buffer, size_t count) {
-    for (size_t b = 0; b < count; b++) {
-        k->j += k->S[++k->i];
-        SWAP(k->S[k->i], k->S[k->j]);
-        buffer[b] = k->S[(k->S[k->i] + k->S[k->j]) & 0xFF];
+    char seed[256];
+    size_t count = sizeof(seed);
+    while (count > 0) {
+        count -= fread(&seed, 1, count, urandom);
     }
+    fclose(urandom);
+    rc4_init(&salt_generator);
+    rc4_schedule(&salt_generator, seed, sizeof(seed));
+    rc4_skip(&salt_generator, 4096);
 }
 
 uint32_t salt_generate() {
-    uint32_t salt;
-    FILE *urandom = fopen("/dev/urandom", "r");
-    if (urandom == NULL) exit(EXIT_FAILURE); // emergency bailout
-    size_t count = sizeof(salt);
-    while (count > 0) {
-        count -= fread(&salt, 1, count, urandom);
+    if (salt_generator.S[0] == salt_generator.S[1]) {
+        salt_init();
     }
-    fclose(urandom);
+    uint32_t salt;
+    rc4_emit(&salt_generator, &salt, sizeof(salt));
     return salt;
 }
 
 void hash_password(uint8_t output[RC4HASH_SIZE], const char *password,
-                   uint32_t difficulty, uint32_t salt) {
+                   uint8_t difficulty, uint32_t salt) {
     /* Write header. */
-    uint32_t ndifficulty = htonl(difficulty);
     memcpy(output, &salt, sizeof(salt));
-    memcpy(output + sizeof(salt), &ndifficulty, sizeof(ndifficulty));
+    memcpy(output + sizeof(salt), &difficulty, sizeof(difficulty));
 
-    /* Initialize hash function. */
+    /* Initialize random generator. */
     struct rc4 rc4;
     rc4_init(&rc4);
-    rc4_schedule(&rc4, (uint8_t *) &salt, sizeof(salt));
+    rc4_schedule(&rc4, (char *) &salt, sizeof(salt));
 
-    /* Run scheduler difficulty times. */
-    uint8_t buffer[256];
+    /* Run scheduler 2^difficulty times. */
+    char buffer[256];
     size_t length = strlen(password);
     memcpy(buffer, password, length);
     rc4_emit(&rc4, buffer + length, sizeof(buffer) - length);
-    for (uint64_t i = 0; i <= difficulty; i++) {
+    for (uint64_t i = 0; i <= 1 << difficulty; i++) {
         rc4_schedule(&rc4, buffer, sizeof(buffer));
     }
 
-    /* Skip difficulty*64 bytes of output. */
-    uint64_t count = difficulty * 64L;
-    while (count > 0) {
-        size_t amount = MIN(count, sizeof(buffer));
-        rc4_emit(&rc4, buffer, amount);
-        count -= amount;
-    }
+    /* Skip 2^(difficulty+6)-1 bytes of output. */
+    rc4_skip(&rc4, (1 << (difficulty + 6)) - 1);
 
     /* Emit output. */
     rc4_emit(&rc4, output + RC4HASH_HEADER_SIZE,
@@ -101,7 +83,7 @@ bool hash_verify(const uint8_t hash[RC4HASH_SIZE], const char *password) {
     uint32_t salt, difficulty;
     memcpy(&salt, hash, sizeof(salt));
     memcpy(&difficulty, hash + sizeof(salt), sizeof(difficulty));
-    difficulty = ntohl(difficulty);
+    //difficulty = (difficulty);
     uint8_t compare[RC4HASH_SIZE];
     hash_password(compare, password, difficulty, salt);
 
@@ -115,7 +97,7 @@ bool hash_verify(const uint8_t hash[RC4HASH_SIZE], const char *password) {
 
 int main(int argc, char **argv) {
     int opt;
-    uint32_t difficulty = 262143;
+    uint32_t difficulty = 18;
     uint32_t salt = salt_generate();
     char *p = NULL, *v = NULL;
 

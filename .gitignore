@@ -1,2 +1,3 @@
 rc4hash
 *.elc
+*.o
