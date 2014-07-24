@@ -11,7 +11,7 @@ static struct rc4 salt_generator;
 static void salt_init() {
     FILE *urandom = fopen("/dev/urandom", "r");
     if (urandom == NULL) {
-        fprintf(stderr, "error: could not seed entropy pool");
+        fprintf(stderr, "error: could not seed entropy pool\n");
         exit(EXIT_FAILURE); // emergency bailout
     }
     char seed[256];
