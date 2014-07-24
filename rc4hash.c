@@ -31,8 +31,7 @@ void rc4_schedule(struct rc4 *k, const uint8_t *key, size_t length) {
 }
 
 void rc4_emit(struct rc4 *k, uint8_t *buffer, size_t count) {
-    size_t b;
-    for (b = 0; b < count; b++) {
+    for (size_t b = 0; b < count; b++) {
         k->j += k->S[++k->i];
         SWAP(k->S[k->i], k->S[k->j]);
         buffer[b] = k->S[(k->S[k->i] + k->S[k->j]) & 0xFF];

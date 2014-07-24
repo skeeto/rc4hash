@@ -26,8 +26,8 @@
           (aref (rc4-state rc4) j) temp)))
 
 (defun rc4-mix (rc4 key)
-  "Mix arbitrary-length KEY into RC4's state. KEY will be treated
-as UTF-8 if multibyte."
+  "Mix arbitrary-length KEY into RC4's state.
+KEY will be treated as UTF-8 if multibyte."
   (let* ((j 0)
          (ukey (string-as-unibyte key))
          (length (length ukey))
