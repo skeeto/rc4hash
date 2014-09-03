@@ -1,4 +1,3 @@
-CC     = clang
 CFLAGS = -std=c99 -O3 -Wall
 
 rc4hash : main.o rc4hash.o rc4.o
