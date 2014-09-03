@@ -88,7 +88,7 @@ static char *slurp(FILE *in) {
 
 int main(int argc, char **argv) {
     uint8_t difficulty = 18;
-    uint32_t salt;
+    uint32_t salt = 0;
     bool binary = false;
     bool gen_salt = true;
 
